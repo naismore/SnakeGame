@@ -12,8 +12,18 @@
 #include <thread>
 #include <chrono>
 #include <conio.h>
+#include <queue>
 
 using FieldType = std::vector<std::vector<char>>;
+using Tail = std::queue<std::pair<int, int>>;
+
+enum Directions
+{
+    up,
+    down,
+    right,
+    left
+};
 
 class Snake
 {
@@ -22,6 +32,7 @@ public:
     //std::vector<std::map<int, int>> coords;
     int coordX;
     int coordY;
+    std::queue<std::pair<int, int>> tail;
 };
 
 class Apple
@@ -43,8 +54,8 @@ public:
 
 Apple InitApple(char itemChar, int fieldHeight, int fieldWidth)
 {
-    int appleCoordX = 1 + rand() % fieldWidth;
-    int appleCoordY = 1 + rand() % fieldHeight;
+    int appleCoordX = rand() % fieldWidth;
+    int appleCoordY = rand() % fieldHeight;
     Apple apple =
     {
         itemChar,
@@ -54,7 +65,7 @@ Apple InitApple(char itemChar, int fieldHeight, int fieldWidth)
     return apple;
 }
 
-FieldType InitField(Field field, Snake snake, Apple apple) // Инициализация поля. Добавляем, отрисовываем.
+FieldType InitField(Field field, Snake snake, Apple apple, Tail tail) // Инициализация поля. Добавляем, отрисовываем.
 {
     FieldType vectorField;
     std::vector<char> fieldString;
@@ -66,6 +77,7 @@ FieldType InitField(Field field, Snake snake, Apple apple) // Инициализ
         if (i == field.height + 1) { externalString = true; };
         for (int j = 0; j < field.width + 2; j++)
         {
+            Tail tempTail = tail;
             if (externalString)
             {
                 fieldString.push_back(field.wallChar);
@@ -92,6 +104,14 @@ FieldType InitField(Field field, Snake snake, Apple apple) // Инициализ
                     {
                         fieldString.push_back(field.fieldChar);
                     }
+                    while (!tempTail.empty())
+                    {
+                        if (j == tempTail.front().first && i == tempTail.front().second)
+                        {
+                            fieldString.push_back(snake.itemChar);
+                            tempTail.pop();
+                        }
+                    }
                 }
             }
         }
@@ -102,7 +122,24 @@ FieldType InitField(Field field, Snake snake, Apple apple) // Инициализ
     return vectorField;
 }
 
-void gotoxy(int x, int y)
+Tail Move(Snake snake, Tail tail, bool eatedApple)
+{
+    if (!eatedApple)
+    {
+        if (!tail.empty())
+        {
+            tail.pop();
+            tail.push({ snake.coordX, snake.coordY });
+        }
+    }
+    else
+    {
+        tail.push({ snake.coordX, snake.coordY });
+    }
+    return tail;
+}
+
+void gotoxy(int x, int y) // Переход в начало консоли
 {
     COORD position;
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -134,10 +171,13 @@ int main()
 
     Field field = Field{ wallChar, fieldChar, fieldHeight, fieldWidth };
     Apple apple = InitApple(appleChar, fieldHeight, fieldWidth);
-    Snake snake = {snakeChar, 2, 2};  
+    Snake snake = {snakeChar, 2, 5};  
     int score = 0;
+    int direction = 1;
+    bool eatedApple = false;
+    Tail tail;
 
-    //Test
+    //Сокрытие курсора
     void* handle = GetStdHandle(STD_OUTPUT_HANDLE);
     CONSOLE_CURSOR_INFO structCursorInfo;
     GetConsoleCursorInfo(handle, &structCursorInfo);
@@ -151,19 +191,52 @@ int main()
 
         if (_kbhit()) {
             char input = _getch();
-            if (input == 'w') snake.coordY--;
-            else if (input == 'a') snake.coordX--;
-            else if (input == 's') snake.coordY++;
-            else if (input == 'd') snake.coordX++;
+            if (input == 'w') direction = up;
+            else if (input == 'a') direction = left;
+            else if (input == 's') direction = down;
+            else if (input == 'd') direction = right;
         }
         
+        switch (direction)
+        {
+        case up:
+            snake.coordY--;
+          
+            break;
+        case down:
+            snake.coordY++;
+            break;
+        case left:
+            snake.coordX--;
+            break;
+        case right:
+            snake.coordX++;
+            break;
+        default:
+            break;
+        }
+
         if (snake.coordX == apple.coordX && snake.coordY == apple.coordY)
         {
             score++;
+            eatedApple = true;
+            apple.coordX = 1 + rand() % fieldWidth;
+            apple.coordY = 1 + rand() % fieldHeight;
         }
-        FieldType vectorField = InitField(field, snake, apple);
-        PrintField(vectorField, score);
+        else if(snake.coordX <= 1 || snake.coordX >= fieldWidth || snake.coordY <= 1 || snake.coordY >= fieldHeight)
+        {
+            gameOver = true;
+        }
+
+
+        FieldType vectorField = InitField(field, snake, apple, tail);
+        PrintField(vectorField, score); Sleep(1000);
+        eatedApple = false;
     }
     
+    system("cls");
+
+    std::cout << "GAME OVER!" << std::endl;
     
+    // сделать змейку фулл из очереди, написать вывод очереди и т.д
 }
